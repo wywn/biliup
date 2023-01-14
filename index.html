@@ -1,0 +1,384 @@
+<meta charset="utf-8" name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=2.0, user-scalable=yes" />
+<title>统计计划 - BILIUP</title>
+<link rel="icon" href="favicon.ico">
+<link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.0/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.0/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.3.3/echarts.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+
+<body class="bg-light bg-opacity-75">
+<div class="container vh-100">
+
+    <nav class="navbar navbar-expand-sm bg-secondary navbar-dark bg-opacity-75 rounded">
+        <div class="container-fluid">
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                <a class="nav-link disabled"><b>统计计划</b></a>
+                </li>
+                <li class="nav-item">
+                <a class="nav-link active" href="#">BILIUP</a>
+                </li>
+                <li class="nav-item">
+                <a class="nav-link" href="../bilibgm/#">BILIBGM</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+<div id="alertArea"></div>
+
+<div class="container mt-3">
+    <div class="row">
+        <div class="col-sm-4 p-3">
+            <div class="card" id="selectionCard">
+                <div class="btn-group text-white card-header">
+                    <a id="s" class="btn btn-primary">单推模式</a>
+                    <a id="dd" class="btn btn-primary">DD模式</a>
+                </div>
+                <div class="card-header">
+                    <a href="#selectUPBox" data-bs-toggle="collapse" class="btn">选择UP主：</a>
+                </div>
+                <div class="collapse show p-2" id="selectUPBox" style="height:200px;overflow:scroll">
+                    <center><div class="spinner-border" id="selectUPSpin"></div></center>
+                </div>
+                <div class="card-header">
+                    <a href="#selectOptBox" data-bs-toggle="collapse" class="btn">选择数据类型：</a>
+                </div>
+                <div class="collapse show p-2" id="selectOptBox">
+                    <center><div class="spinner-border" id="selectOptSpin"></div></center>
+                </div>
+                <div class="card-header d-grid">
+                    <a id="submit" class="btn btn-primary btn-block">提交</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-8 p-3" style="min-height: 800px;">
+            <div class="card bg-white text-dark" id="chartCard" style="height: 100%">
+                <div class="card-body" id="container-parent" style="height: 100%">
+                    <h4 style="line-height: 20px" class="card-title text-dark" id="chartTitle">Welcome</h4>
+                    <div id="container" style="height: 100%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div>
+<script>
+    var defaultCheckedUP = 5;
+    var optNames = {
+        "fo": "粉丝数",
+        "g3": "舰长数",
+        "g2": "提督数",
+        "g1": "总督数",
+        "ga": "大航海总人数",
+        "fc": "粉丝团人数",
+        "g3-fo": "舰长数占粉丝数之比",
+        "g2-fo": "提督数占粉丝数之比",
+        "g1-fo": "总督数占粉丝数之比",
+        "ga-fo": "大航海总数占粉丝数之比",
+        "fc-fo": "粉丝团人数占粉丝数之比",
+        "g3-ga": "舰长数占大航海总数之比",
+        "g2-ga": "提督数占大航海总数之比",
+        "g1-ga": "总督数占大航海总数之比"
+    };
+    var selections = ["opt",[
+        ["fo","checked"],
+        ["g3",""],
+        ["g2",""],
+        ["g1",""],
+        ["ga","checked"],
+        ["fc","checked"],
+        ["g3-fo",""],
+        ["g2-fo",""],
+        ["g1-fo",""],
+        ["ga-fo",""],
+        ["fc-fo",""],
+        ["g3-ga",""],
+        ["g2-ga",""],
+        ["g1-ga",""]
+    ]];
+    var all_seriesSet_inner = {
+        smooth: true,
+        type: 'line',
+        lineStyle: {
+            width: 2
+        }
+    }
+    function area(min,max,value){
+        return value.min < max && value.min > min && value.max < max && value.max > min;
+    }
+    var all_yAxisSet_outer = {
+        show: true,
+        min: function (value) {
+            var num;
+            if (area(0,+Infinity,value)){
+                num = value.min - (value.max - value.min) * 0.2;
+                num = num - num % 10;
+            }
+
+            return num;
+        },
+        max: function (value) {
+            var num;
+            if (area(100,+Infinity,value)){
+                num = value.max + (value.max - value.min) * 0.2;
+                num = num - num % 10 + 10;
+            }
+
+            return num;
+        }
+    }
+    var dd_upSeriesSet= [
+        {
+            id: "default",
+            setting: {
+                smooth: true,
+                type: 'line',
+            }
+        }
+    ]
+    var dd_upYAxisSet = {
+        /*boundaryGap: [0, '100%'],
+        splitLine: {
+            show: true
+        },
+        minInterval: 1,
+        axisTick: {
+            interval: 2
+        }*/
+        nameTextStyle: {
+            fontStyle: 'oblique',
+            fontSize: 10,
+            overflow: 'truncate',
+            padding:[0,10,0,0]
+        }
+    };
+    var s_optSeriesSet = {
+        fo: {
+            type: "line"
+        },
+        g3: {
+            type: "bar"
+        },
+        g2: {
+            type: "bar"
+        },
+        g1: {
+            type: "bar"
+        },
+        ga: {
+            type: "line"
+        },
+        fc: {
+            type: "line"
+        },
+        "g3-fo": {
+            type: "line"
+        },
+        "g2-fo": {
+            type: "line"
+        },
+        "g1-fo": {
+            type: "line"
+        },
+        "ga-fo": {
+            type: "line"
+        },
+        "fc-fo": {
+            type: "line"
+        },
+        "g3-ga": {
+            type: "line"
+        },
+        "g2-ga": {
+            type: "line"
+        },
+        "g1-ga": {
+            type: "line"
+        }
+    };
+    var rotate = 0;
+    var v1 = {
+        axisLabel: {
+            formatter: '{value} 人',
+            rotate: rotate
+        },
+        minInterval: 1
+    };
+    var v2 = {
+        axisLabel: {
+            formatter: '{value}％',
+            rotate: rotate
+        }
+    };
+    var va = {
+        show: true
+    }
+    var optYAxisSet = {
+        fo: {
+            ...v1,
+            ...va            
+        },
+        g3: {
+            ...v1,
+            ...va
+        },
+        g2: {
+            ...v1,
+            ...va
+        },
+        g1: {
+            ...v1,
+            ...va
+        },
+        ga: {
+            ...v1,
+            ...va
+        },
+        fc: {
+            ...v1,
+            ...va
+        },
+        "g3-fo": {
+            ...v2,
+            ...va
+        },
+        "g2-fo": {
+            ...v2,
+            ...va
+        },
+        "g1-fo": {
+            ...v2,
+            ...va
+        },
+        "ga-fo": {
+            ...v2,
+            ...va
+        },
+        "fc-fo": {
+            ...v2,
+            ...va
+        },
+        "g3-ga": {
+            ...v2,
+            ...va
+        },
+        "g2-ga": {
+            ...v2,
+            ...va
+        },
+        "g1-ga": {
+            ...v2,
+            ...va
+        }
+    }
+    var chartCommonSet = {
+        title: {
+            zlevel: 0,
+            z: 0
+        }
+    };
+    var chartOptionBasic = {
+        animation: true,
+        toolbox: {
+            zlevel: 1,
+            z: 1,
+            show: true,
+            feature:{
+                dataView: {
+                    show: true,
+                    readOnly: true,
+                    optionToContent: function(opt) {
+                        console.log(opt)
+                        var series = opt.series;
+                        var table = '<table class="table table-hover" style="width:100%;"><tbody><tr class="table-light">'
+                                    + '<th>时间</th>';
+                        for (var i = 0;i < series.length;i++){
+                            table += '<th>' + series[i].name + '</th>'
+                        }
+                        table += '</th>';
+                        for (var i = 0, l = series[0].data.length; i < l; i++) {
+                            date = new Date(series[0].data[i][0]).toLocaleString();
+                            table += '<tr>' + '<td>' + date.substr(2,date.length-5) + '</td>';
+                            for (var n = 0;n < series.length;n++){
+                                table += '<td>' + series[n].data[i][1] + '</td>';
+                            }
+                            table += '</tr>';
+                        }
+                        table += '</tbody></table>';
+                        return table;
+                    },
+                    buttonColor: "#0d6efd"
+                },
+                dataZoom: {
+                    yAxisIndex:"none"
+                },
+                /*saveAsImage:{
+                    type: "png",
+                    pixelRatio: 2
+                },*/
+                myTool1: {
+                    show: true,
+                    title: '全屏',
+                    icon: 'path://M432.45,595.444c0,2.177-4.661,6.82-11.305,6.82c-6.475,0-11.306-4.567-11.306-6.82s4.852-6.812,11.306-6.812C427.841,588.632,432.452,593.191,432.45,595.444L432.45,595.444z M421.155,589.876c-3.009,0-5.448,2.495-5.448,5.572s2.439,5.572,5.448,5.572c3.01,0,5.449-2.495,5.449-5.572C426.604,592.371,424.165,589.876,421.155,589.876L421.155,589.876z M421.146,591.891c-1.916,0-3.47,1.589-3.47,3.549c0,1.959,1.554,3.548,3.47,3.548s3.469-1.589,3.469-3.548C424.614,593.479,423.062,591.891,421.146,591.891L421.146,591.891zM421.146,591.891',
+                    onclick: function (){
+                        if (!fullScreen){
+                            fullScreen = true;
+                            const func =
+                                dompar.requestFullscreen ||
+                                dompar.mozRequestFullScreen ||
+                                dompar.webkitRequestFullscreen ||
+                                dompar.msRequestFullscreen;
+                            func.call(dompar);
+                        }
+                        else {
+                            fullScreen = false;
+                            const func =
+                                document.exitFullScreen ||
+                                document.mozCancelFullScreen ||
+                                document.webkitExitFullscreen ||
+                                document.msExitFullscreen;
+                            func.call(document);
+                        }
+                    }
+                }
+            }
+        },
+        /*grid: {
+            // 距离容器上边界40像素
+            //bottom: '15%', // 下边界距离
+            //right: '13%', // 右边界距离
+            //left: '2%', // 左边界距离
+            //containLabel: true // 保证label不会被挤掉
+        },*/
+        legend: {
+            show: true,
+            orient: 'vertical',
+            top: '10%',
+            left: "20%"
+        },
+        dataZoom:[{
+            type: "slider",
+            throttle: 1000
+        }],
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+                type: 'line',
+                animation: true
+            },
+            confine: true,
+            enterable: true
+        },
+        xAxis: {
+            type: 'time',
+            splitLine: {
+                show: false
+            }
+        }
+    };
+</script>
+<script src="main.js"></script>
+<script src="welcome.js"></script>
+</body>
